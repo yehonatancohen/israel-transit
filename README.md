@@ -15,6 +15,11 @@ View your app in AI Studio: https://ai.studio/apps/drive/1iDZeVCyZGTv_9vL_XcqJOn
 
 1. Install dependencies:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+2. Create an `.env.local` file with the following variables:
+   ```bash
+   VITE_BACKEND_URL=http://127.0.0.1:8080
+   VITE_OPENROUTER_API_KEY=<your-openrouter-api-key>
+   VITE_OPENROUTER_MODEL=<openrouter-model-identifier>
+   ```
 3. Run the app:
    `npm run dev`

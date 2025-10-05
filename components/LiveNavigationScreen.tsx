@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { type RouteOption, type SessionUpdateResponse } from '../types';
-import { progressTrip } from '../services/mockApi';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { type Coordinate, type RouteOption } from '../types';
+import { progressTrip } from '../services/api';
 import { WalkIcon, BusIcon, TrainIcon, ClockIcon } from './icons';
 
 interface LiveNavigationScreenProps {
@@ -15,18 +15,57 @@ const LiveNavigationScreen: React.FC<LiveNavigationScreenProps> = ({ route, sess
   const [advice, setAdvice] = useState('You are on the best route.');
   const [betterOptions, setBetterOptions] = useState<RouteOption[]>([]);
   const [progress, setProgress] = useState(0);
+  const locationRef = useRef<Coordinate | null>(null);
+  const [hasLocationFix, setHasLocationFix] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
 
   const currentLeg = route.legs[currentLegIndex];
   
   const updateProgress = useCallback(async () => {
+    const currentLocation = locationRef.current;
+    if (!currentLocation) {
+      return;
+    }
+
     try {
-      const response = await progressTrip(sessionId);
+      const response = await progressTrip(sessionId, currentLocation);
       setAdvice(response.advice);
       setBetterOptions(response.maybe_better_options);
     } catch (error) {
       console.error("Failed to update trip progress:", error);
     }
   }, [sessionId]);
+
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      setLocationError('Geolocation is not supported in this browser.');
+      return;
+    }
+
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        locationRef.current = {
+          lat: position.coords.latitude,
+          lon: position.coords.longitude,
+        };
+        setHasLocationFix(true);
+        setLocationError(null);
+      },
+      (error) => {
+        console.error('Geolocation error', error);
+        setLocationError(error.message);
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 10000,
+        timeout: 10000,
+      }
+    );
+
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+    };
+  }, []);
 
   useEffect(() => {
     const progressInterval = setInterval(() => {
@@ -53,6 +92,12 @@ const LiveNavigationScreen: React.FC<LiveNavigationScreenProps> = ({ route, sess
       clearInterval(apiInterval);
     };
   }, [currentLegIndex, route.legs.length, updateProgress]);
+
+  useEffect(() => {
+    if (hasLocationFix) {
+      void updateProgress();
+    }
+  }, [hasLocationFix, updateProgress]);
 
   const LegIcon = ({ mode }: { mode: string }) => {
     const props = { className: "h-12 w-12 text-brand-gray-900" };
@@ -97,6 +142,12 @@ const LiveNavigationScreen: React.FC<LiveNavigationScreenProps> = ({ route, sess
         </div>
         
         {/* Advice Section */}
+        {locationError && (
+            <div className="bg-brand-red/20 border border-brand-red/40 text-brand-red text-sm p-3 rounded-lg mb-4">
+                {locationError}
+            </div>
+        )}
+
         {(advice !== 'You are on the best route.' || betterOptions.length > 0) && (
             <div className="bg-brand-blue p-4 rounded-xl shadow-lg">
                 <h3 className="font-bold">Heads up!</h3>
