@@ -4,8 +4,8 @@ import HomeScreen from './components/HomeScreen';
 import ResultsScreen from './components/ResultsScreen';
 import RouteDetailsScreen from './components/RouteDetailsScreen';
 import LiveNavigationScreen from './components/LiveNavigationScreen';
-import { searchRoutes, startTrip, progressTrip } from './services/mockApi';
-import { type RouteOption, type Coordinate, type SessionUpdateResponse } from './types';
+import { searchRoutes, startTrip } from './services/api';
+import { type RouteOption, type Coordinate, type SearchRequest } from './types';
 
 type Screen = 'home' | 'results' | 'details' | 'live';
 
@@ -16,13 +16,21 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [lastSearchRequest, setLastSearchRequest] = useState<SearchRequest | null>(null);
 
   const handleSearch = useCallback(async (origin: Coordinate, destination: Coordinate, notes?: string) => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await searchRoutes({ origin, destination, notes });
+      const trimmedNotes = notes?.trim();
+      const request: SearchRequest = {
+        origin,
+        destination,
+        ...(trimmedNotes ? { notes: trimmedNotes } : {}),
+      };
+      const response = await searchRoutes(request);
       setRouteOptions(response.options);
+      setLastSearchRequest(request);
       setScreen('results');
     } catch (err) {
       setError('Failed to find routes. Please try again.');
@@ -39,7 +47,10 @@ const App: React.FC = () => {
   const handleStartTrip = useCallback(async (routeId: string) => {
     setIsLoading(true);
     try {
-      const session = await startTrip(routeId);
+      const session = await startTrip(routeId, lastSearchRequest?.notes ?? null);
+      if (!session?.session_id) {
+        throw new Error('Missing session identifier');
+      }
       setSessionId(session.session_id);
       setScreen('live');
     } catch (err) {
@@ -47,7 +58,7 @@ const App: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [lastSearchRequest?.notes]);
 
   const handleEndTrip = useCallback(() => {
     setSessionId(null);
