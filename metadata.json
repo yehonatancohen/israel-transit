@@ -1,0 +1,5 @@
+{
+  "name": "Israel Transit",
+  "description": "A minimal and fast public transit app for Israel, providing reliable, delay-aware route suggestions and live navigation.",
+  "requestFramePermissions": []
+}
